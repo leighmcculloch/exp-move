@@ -1,9 +1,10 @@
 script {
 
     use 0x2::Coin;
+    use 0x3::Fun::FunCoin;
 
     fun mint(s: signer, to: address, amount: u64) {
-        Coin::mint(&s, to, amount)
+        Coin::mint<FunCoin>(&s, to, amount)
     }
 
 }
