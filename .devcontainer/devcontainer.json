@@ -1,0 +1,14 @@
+{
+	"name": "Ubuntu",
+	"build": {
+		"dockerfile": "Dockerfile",
+		"args": {
+			"VARIANT": "hirsute"
+		}
+	},
+	"settings": {},
+	"extensions": [
+		"PontemNetwork.move-language"
+	],
+	"remoteUser": "vscode"
+}
