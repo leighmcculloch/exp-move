@@ -5,7 +5,7 @@
 ```
 sudo apt update
 sudo apt install libssl-dev pkg-config
-cargo install --git https://github.com/diem/diem move-cli --branch main
+cargo install --git https://github.com/diem/move move-cli --branch main
 ```
 
 ## Usage
