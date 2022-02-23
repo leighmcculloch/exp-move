@@ -30,5 +30,5 @@ move sandbox run sources/scripts/mint.move --signers 0x2 --args 0x4 --args 10
 
 Do some things with the accounts and coin:
 ```
-move sandbox run sources/scripts/give.move --signers 0x2 --args 0x4 --args 2
+move sandbox run sources/scripts/give.move --signers 0x3 --args 0x4 --args 2
 ```
