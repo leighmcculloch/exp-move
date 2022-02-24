@@ -16,6 +16,7 @@ address 0x2 {
             i_seq: u64,
             r_seq: u64,
             seq_time: u64,
+            closed: bool,
         }
 
         struct Membership<phantom T> has key, store {
@@ -31,6 +32,7 @@ address 0x2 {
                 i_seq: 0,
                 r_seq: 0,
                 seq_time: 0,
+                closed: false,
             })
         }
 
@@ -47,6 +49,12 @@ address 0x2 {
             assert!(i_or_r == internal.i || i_or_r == internal.r, ENOT_PARTICIPANT);
             let amount = &mut borrow_global_mut<Membership<T>>(i_or_r).amount;
             Coin::merge_into<T>(amount, a)
+        }
+
+        public fun leave<T>(i_or_r: &signer): Amount<T> acquires Membership {
+            let i_or_r_addr = Signer::address_of(i_or_r);
+            let Membership { amount } = move_from<Membership<T>>(i_or_r_addr);
+            amount
         }
 
         public fun start_close(_i_msg: vector<u8>, _r_msg: vector<u8>) acquires Internal {
