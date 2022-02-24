@@ -43,6 +43,10 @@ address 0x2 {
             value
         }
 
+        public fun zero<T>(): Amount<T> {
+            Amount<T>{value: 0}
+        }
+
         public fun trust<T>(account: &signer) {
             move_to(account, Amount<T>{value: 0})
         }
@@ -57,6 +61,23 @@ address 0x2 {
             let c0 = Amount { value: take };
             let c1 = Amount { value: value-take };
             (c0, c1)
+        }
+
+        public fun split_out<T>(amount: &mut Amount<T>, take: u64): Amount<T> {
+            assert!(take < amount.value, EINSUFFICIENT_VALUE);
+            amount.value = amount.value - take;
+            Amount { value: take }
+        }
+
+        public fun merge<T>(a1: Amount<T>, a2: Amount<T>): Amount<T> {
+            let Amount<T> { value: v1 } = a1;
+            let Amount<T> { value: v2 } = a2;
+            Amount { value: v1 + v2 }
+        }
+
+        public fun merge_into<T>(a1: &mut Amount<T>, a2: Amount<T>) {
+            let Amount<T> { value: v2 } = a2;
+            a1.value = a1.value + v2;
         }
 
         public fun get<T>(account: &signer): Amount<T> acquires Amount {
