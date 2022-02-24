@@ -9,6 +9,7 @@ address 0x2 {
         const ENOT_PARTICIPANT: u64 = 1;
         const ESUPERSEDED: u64 = 2;
         const ENOT_CLOSING: u64 = 3;
+        const ENOT_CLOSED: u64 = 4;
 
         struct Internal has key {
             i: address,
@@ -51,7 +52,9 @@ address 0x2 {
             Coin::merge_into<T>(amount, a)
         }
 
-        public fun leave<T>(i_or_r: &signer): Amount<T> acquires Membership {
+        public fun leave<T>(i_or_r: &signer): Amount<T> acquires Internal, Membership {
+            let internal = borrow_global<Internal>(@0x2);
+            assert!(internal.closed, ENOT_CLOSED);
             let i_or_r_addr = Signer::address_of(i_or_r);
             let Membership { amount } = move_from<Membership<T>>(i_or_r_addr);
             amount
