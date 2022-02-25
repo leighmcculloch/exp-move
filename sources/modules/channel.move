@@ -70,6 +70,7 @@ address 0x2 {
             assert!(is_closed<T>(), ENOT_CLOSED);
             let Membership { amount } = move_from<Membership<T>>(acc_addr);
             amount
+            // TODO: We need to split this amount based on what is owed.
         }
 
         public fun close<T>(seq: u64, payer: &signer, payee: &signer, amount: u64, delay: u64) acquires Config, CloseState {
