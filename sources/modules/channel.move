@@ -1,7 +1,6 @@
 address 0x2 {
     module Channel {
         use Std::Signer;
-        use Std::Vector;
         use 0x2::Coin;
         use 0x2::Coin::Amount;
         use 0x2::Time;
@@ -24,7 +23,7 @@ address 0x2 {
 
         // CloseState contains values set when closing.
         struct CloseState<phantom T> has key {
-            seq: u8,
+            seq: u64,
             seq_time: u64,
             i_pays_r: bool,
             amount: u64,
@@ -73,39 +72,26 @@ address 0x2 {
             amount
         }
 
-        public fun close<T>(msg: vector<u8>) acquires Config, CloseState {
+        public fun close<T>(seq: u64, payer: &signer, payee: &signer, amount: u64) acquires Config, CloseState {
             assert!(!is_closed<T>(), ECLOSED);
+            let payer_addr = Signer::address_of(payer);
+            assert!(is_member<T>(payer_addr), ECLOSED);
+            let payee_addr = Signer::address_of(payee);
+            assert!(is_member<T>(payee_addr), ECLOSED);
 
-            assert!(Vector::length(&msg) == 10, EMALFORMED);
-            let seq = *Vector::borrow(&msg, 0);
-            let i_pays_r = *Vector::borrow(&msg, 1) & 0x80 == 0; // 0 is i pays r, 1 is r pays i. i.e. negative values r pays i.
-            let amt =
-                ((*Vector::borrow(&msg, 1) as u64) & 0x7F) << 7 |
-                (*Vector::borrow(&msg, 2) as u64) << 6 |
-                (*Vector::borrow(&msg, 3) as u64) << 5 |
-                (*Vector::borrow(&msg, 4) as u64) << 4 |
-                (*Vector::borrow(&msg, 5) as u64) << 3 |
-                (*Vector::borrow(&msg, 6) as u64) << 2 |
-                (*Vector::borrow(&msg, 7) as u64) << 1 |
-                (*Vector::borrow(&msg, 8) as u64);
-            let sig = *Vector::borrow(&msg, 9);
+            let close_seq = &mut borrow_global_mut<CloseState<T>>(@0x2).seq;
+            assert!(seq > *close_seq, ESUPERSEDED);
+            *close_seq = seq;
 
-            // Signature scheme is for i's signature to set bit 2, and r's
-            // signature to set bit 1.
-            assert!(sig == 3, ENOT_SIGNED);
+            let close_seq_time = &mut borrow_global_mut<CloseState<T>>(@0x2).seq_time;
+            *close_seq_time = Time::now();
 
-            let internal_seq = &mut borrow_global_mut<CloseState<T>>(@0x2).seq;
-            assert!(seq > *internal_seq, ESUPERSEDED);
-            *internal_seq = seq;
+            let config_i = borrow_global<Config<T>>(@0x2).i;
+            let close_i_pays_r = &mut borrow_global_mut<CloseState<T>>(@0x2).i_pays_r;
+            *close_i_pays_r = payer_addr == config_i;
 
-            let internal_seq_time = &mut borrow_global_mut<CloseState<T>>(@0x2).seq_time;
-            *internal_seq_time = Time::now();
-
-            let internal_i_pays_r = &mut borrow_global_mut<CloseState<T>>(@0x2).i_pays_r;
-            *internal_i_pays_r = i_pays_r;
-
-            let internal_amount = &mut borrow_global_mut<CloseState<T>>(@0x2).amount;
-            *internal_amount = amt;
+            let close_amount = &mut borrow_global_mut<CloseState<T>>(@0x2).amount;
+            *close_amount = amount;
         }
 
         public fun is_member<T>(acc: address): bool acquires Config {
@@ -113,7 +99,7 @@ address 0x2 {
             acc == internal.i || acc == internal.r
         }
 
-        public fun seq<T>(): u8 acquires CloseState {
+        public fun seq<T>(): u64 acquires CloseState {
             borrow_global<CloseState<T>>(@0x2).seq
         }
 
