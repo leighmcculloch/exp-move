@@ -7,7 +7,7 @@ address 0x2 {
         use 0x2::Time;
 
         const ENOT_MODULE: u64 = 0;
-        const ENOT_PARTICIPANT: u64 = 1;
+        const ENOT_MEMBER: u64 = 1;
         const ESUPERSEDED: u64 = 2;
         const ENOT_CLOSING: u64 = 3;
         const ENOT_CLOSED: u64 = 4;
@@ -15,57 +15,70 @@ address 0x2 {
         const ENOT_SIGNED: u64 = 6;
         const ECLOSED: u64 = 7;
 
-        struct Internal<phantom T> has key {
+        // Config contains values fixed at initialization.
+        struct Config<phantom T> has key {
             i: address,
             r: address,
-            seq: u8,
-            seq_time: u64,
-            closed: bool,
+            observation_period: u64,
         }
 
-        struct Membership<phantom T> has key, store {
+        // CloseState contains values set when closing.
+        struct CloseState<phantom T> has key {
+            seq: u8,
+            seq_time: u64,
+            i_pays_r: bool,
+            amount: u64,
+        }
+
+        // Membership holds amounts locked up by a member for use in the
+        // channel.
+        struct Membership<phantom T> has key {
             amount: Amount<T>,
         }
 
-        public fun init<T>(s: &signer, i: address, r: address) {
+        public fun init<T>(s: &signer, i: address, r: address, observation_period: u64) {
             let s_addr = Signer::address_of(s);
             assert!(s_addr == @0x2, ENOT_MODULE);
-            move_to(s, Internal<T>{
+            move_to(s, Config<T>{
                 i: i,
                 r: r,
+                observation_period: observation_period,
+            });
+            move_to(s, CloseState<T>{
                 seq: 0,
                 seq_time: 0,
-                closed: false,
-            })
+                i_pays_r: true,
+                amount: 0,
+            });
         }
 
-        public fun join<T>(i_or_r: &signer) acquires Internal {
-            let i_or_r_addr = Signer::address_of(i_or_r);
-            let internal = borrow_global<Internal<T>>(@0x2);
-            assert!(i_or_r_addr == internal.i || i_or_r_addr == internal.r, ENOT_PARTICIPANT);
+        public fun join<T>(acc: &signer) acquires Config {
+            let acc_addr = Signer::address_of(acc);
+            assert!(is_member<T>(acc_addr), ENOT_MEMBER);
             let zero = Coin::zero<T>();
-            move_to(i_or_r, Membership<T>{amount: zero})
+            move_to(acc, Membership<T>{amount: zero})
         }
 
-        public fun deposit<T>(i_or_r: address, a: Amount<T>) acquires Internal, Membership {
-            let internal = borrow_global<Internal<T>>(@0x2);
-            assert!(i_or_r == internal.i || i_or_r == internal.r, ENOT_PARTICIPANT);
-            let amount = &mut borrow_global_mut<Membership<T>>(i_or_r).amount;
+        public fun deposit<T>(acc: address, a: Amount<T>) acquires Config, Membership {
+            assert!(is_member<T>(acc), ENOT_MEMBER);
+            let amount = &mut borrow_global_mut<Membership<T>>(acc).amount;
             Coin::merge_into<T>(amount, a)
         }
 
-        public fun leave<T>(i_or_r: &signer): Amount<T> acquires Internal, Membership {
-            let internal = borrow_global<Internal<T>>(@0x2);
-            assert!(internal.closed, ENOT_CLOSED);
-            let i_or_r_addr = Signer::address_of(i_or_r);
-            let Membership { amount } = move_from<Membership<T>>(i_or_r_addr);
+        public fun leave<T>(acc: &signer): Amount<T> acquires Config, CloseState, Membership {
+            let acc_addr = Signer::address_of(acc);
+            assert!(is_member<T>(acc_addr), ENOT_MEMBER);
+            assert!(is_closed<T>(), ENOT_CLOSED);
+            let Membership { amount } = move_from<Membership<T>>(acc_addr);
             amount
         }
 
-        public fun close<T>(msg: vector<u8>) acquires Internal {
+        public fun close<T>(msg: vector<u8>) acquires Config, CloseState {
+            assert!(!is_closed<T>(), ECLOSED);
+
             assert!(Vector::length(&msg) == 10, EMALFORMED);
             let seq = *Vector::borrow(&msg, 0);
-            let dir = *Vector::borrow(&msg, 1) & 0x80; // 0 is i pay r, 1 is r pays i.
+            let i_pays_r = *Vector::borrow(&msg, 1) & 0x80 == 0; // 0 is i pays r, 1 is r pays i. i.e. negative values r pays i.
             let amt =
                 ((*Vector::borrow(&msg, 1) as u64) & 0x7F) << 7 |
                 (*Vector::borrow(&msg, 2) as u64) << 6 |
@@ -81,30 +94,37 @@ address 0x2 {
             // signature to set bit 1.
             assert!(sig == 3, ENOT_SIGNED);
 
-            let internal = borrow_global<Internal<T>>(@0x2);
-            assert!(!internal.closed, ECLOSED);
-            assert!(seq > internal.seq, ESUPERSEDED);
+            let internal_seq = &mut borrow_global_mut<CloseState<T>>(@0x2).seq;
+            assert!(seq > *internal_seq, ESUPERSEDED);
+            *internal_seq = seq;
 
+            let internal_seq_time = &mut borrow_global_mut<CloseState<T>>(@0x2).seq_time;
+            *internal_seq_time = Time::now();
 
-            // let internal_i_seq = &mut borrow_global_mut<Internal>(@0x2).i_seq;
-            // let internal_r_seq = &mut borrow_global_mut<Internal>(@0x2).r_seq;
-            // let internal_seq_time = &mut borrow_global_mut<Internal>(@0x2).seq_time;
-            // *internal_i_seq = seq;
-            // *internal_r_seq = seq;
-            // *internal_seq_time = Time::now();
+            let internal_i_pays_r = &mut borrow_global_mut<CloseState<T>>(@0x2).i_pays_r;
+            *internal_i_pays_r = i_pays_r;
+
+            let internal_amount = &mut borrow_global_mut<CloseState<T>>(@0x2).amount;
+            *internal_amount = amt;
         }
 
-        public fun seq<T>(i_or_r: address): u8 acquires Internal {
-            borrow_global<Internal<T>>(@0x2).seq
+        public fun is_member<T>(acc: address): bool acquires Config {
+            let internal = borrow_global<Config<T>>(@0x2);
+            acc == internal.i || acc == internal.r
         }
 
-        public fun seq_time<T>(): u64 acquires Internal {
-            borrow_global<Internal<T>>(@0x2).seq_time
+        public fun seq<T>(): u8 acquires CloseState {
+            borrow_global<CloseState<T>>(@0x2).seq
         }
 
-        public fun closed<T>(): bool acquires Internal {
-            let seq_time = borrow_global<Internal<T>>(@0x2).seq_time;
-            seq_time > 0 && seq_time < Time::now()
+        public fun seq_time<T>(): u64 acquires CloseState {
+            borrow_global<CloseState<T>>(@0x2).seq_time
+        }
+
+        public fun is_closed<T>(): bool acquires Config, CloseState {
+            let observation_period = borrow_global<Config<T>>(@0x2).observation_period;
+            let seq_time = borrow_global<CloseState<T>>(@0x2).seq_time;
+            seq_time > 0 && (seq_time + observation_period) < Time::now()
         }
     }
 }
