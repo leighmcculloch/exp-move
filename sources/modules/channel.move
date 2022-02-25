@@ -24,8 +24,9 @@ address 0x2 {
         struct CloseState<phantom T> has key {
             seq: u64,
             seq_time: u64,
-            i_pays_r: bool,
-            amount: u64,
+            payer: address,
+            payee: address,
+            amount: Amount<T>,
             delay: u64,
         }
 
@@ -46,8 +47,9 @@ address 0x2 {
             move_to(s, CloseState<T>{
                 seq: 0,
                 seq_time: 0,
-                i_pays_r: true,
-                amount: 0,
+                payer: i,
+                payee: r,
+                amount: Coin::zero<T>(),
                 delay: 0,
             });
         }
@@ -71,10 +73,9 @@ address 0x2 {
             assert!(is_closed<T>(), ENOT_CLOSED);
             let Membership { amount } = move_from<Membership<T>>(acc_addr);
             amount
-            // TODO: We need to split this amount based on what is owed.
         }
 
-        public fun close<T>(seq: u64, payer: &signer, payee: &signer, amount: u64, delay: u64) acquires Config, CloseState {
+        public fun close<T>(seq: u64, payer: &signer, payee: &signer, amount: u64, delay: u64) acquires Config, CloseState, Membership {
             assert!(!is_closed<T>(), ECLOSED);
 
             let payer_addr = Signer::address_of(payer);
@@ -90,12 +91,19 @@ address 0x2 {
             let close_seq_time = &mut borrow_global_mut<CloseState<T>>(@0x2).seq_time;
             *close_seq_time = Time::now();
 
-            let config_i = borrow_global<Config<T>>(@0x2).i;
-            let close_i_pays_r = &mut borrow_global_mut<CloseState<T>>(@0x2).i_pays_r;
-            *close_i_pays_r = payer_addr == config_i;
-
+            let close_payer_amount = &mut borrow_global_mut<Membership<T>>(payer_addr).amount;
             let close_amount = &mut borrow_global_mut<CloseState<T>>(@0x2).amount;
-            *close_amount = amount;
+            Coin::merge_into_from(close_payer_amount, close_amount);
+
+            let payer_amount = &mut borrow_global_mut<Membership<T>>(payer_addr).amount;
+            let payment_amount = Coin::split_out(payer_amount, amount);
+            Coin::merge_into(close_amount, payment_amount);
+
+            let close_payer = &mut borrow_global_mut<CloseState<T>>(@0x2).payer;
+            *close_payer = payer_addr;
+
+            let close_payee = &mut borrow_global_mut<CloseState<T>>(@0x2).payee;
+            *close_payee = payee_addr;
 
             let close_delay = &mut borrow_global_mut<CloseState<T>>(@0x2).delay;
             *close_delay = delay;

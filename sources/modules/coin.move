@@ -80,6 +80,11 @@ address 0x2 {
             a1.value = a1.value + v2;
         }
 
+        public fun merge_into_from<T>(a1: &mut Amount<T>, a2: &mut Amount<T>) {
+            a1.value = a1.value + a2.value;
+            a2.value = 0;
+        }
+
         public fun get<T>(account: &signer): Amount<T> acquires Amount {
             let account_addr = Signer::address_of(account);
             let value = &mut borrow_global_mut<Amount<T>>(account_addr).value;
