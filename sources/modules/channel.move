@@ -37,6 +37,7 @@ address 0x2 {
 
         public fun init<T>(s: &signer, i: address, r: address) {
             let s_addr = Signer::address_of(s);
+            // TODO: Remove this 0x2 dependence.
             assert!(s_addr == @0x2, ENOT_MODULE);
             move_to(s, Config<T>{
                 i: i,

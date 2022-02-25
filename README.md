@@ -40,7 +40,7 @@ move sandbox run sources/scripts/3_pay.move --signers 0x3 --args 0x4 --args 2
 Initialize the time module which we need for a channel. This module would be
 provided by the system supposedly.
 ```
-move sandbox run sources/scripts/4_time_init.move
+move sandbox run sources/scripts/4_time_init.move --signers 0x2
 ```
 
 Initialize a channel between the two accounts:
@@ -108,5 +108,6 @@ move sandbox run sources/scripts/10_channel_withdraw.move --signers 0x4
 
 Inspecting the amounts that 0x3 and 0x4 have in storage should be updated:
 ```
-move sandbox view ...
+move sandbox view storage/0x*3/resources/*Amount*
+move sandbox view storage/0x*4/resources/*Amount*
 ```
