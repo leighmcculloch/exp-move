@@ -18,7 +18,6 @@ address 0x2 {
         struct Config<phantom T> has key {
             i: address,
             r: address,
-            observation_period: u64,
         }
 
         // CloseState contains values set when closing.
@@ -27,6 +26,7 @@ address 0x2 {
             seq_time: u64,
             i_pays_r: bool,
             amount: u64,
+            delay: u64,
         }
 
         // Membership holds amounts locked up by a member for use in the
@@ -35,19 +35,19 @@ address 0x2 {
             amount: Amount<T>,
         }
 
-        public fun init<T>(s: &signer, i: address, r: address, observation_period: u64) {
+        public fun init<T>(s: &signer, i: address, r: address) {
             let s_addr = Signer::address_of(s);
             assert!(s_addr == @0x2, ENOT_MODULE);
             move_to(s, Config<T>{
                 i: i,
                 r: r,
-                observation_period: observation_period,
             });
             move_to(s, CloseState<T>{
                 seq: 0,
                 seq_time: 0,
                 i_pays_r: true,
                 amount: 0,
+                delay: 0,
             });
         }
 
@@ -64,7 +64,7 @@ address 0x2 {
             Coin::merge_into<T>(amount, a)
         }
 
-        public fun leave<T>(acc: &signer): Amount<T> acquires Config, CloseState, Membership {
+        public fun withdraw<T>(acc: &signer): Amount<T> acquires Config, CloseState, Membership {
             let acc_addr = Signer::address_of(acc);
             assert!(is_member<T>(acc_addr), ENOT_MEMBER);
             assert!(is_closed<T>(), ENOT_CLOSED);
@@ -72,8 +72,9 @@ address 0x2 {
             amount
         }
 
-        public fun close<T>(seq: u64, payer: &signer, payee: &signer, amount: u64) acquires Config, CloseState {
+        public fun close<T>(seq: u64, payer: &signer, payee: &signer, amount: u64, delay: u64) acquires Config, CloseState {
             assert!(!is_closed<T>(), ECLOSED);
+
             let payer_addr = Signer::address_of(payer);
             let payee_addr = Signer::address_of(payee);
             assert!(payer_addr != payee_addr, EMALFORMED);
@@ -93,6 +94,9 @@ address 0x2 {
 
             let close_amount = &mut borrow_global_mut<CloseState<T>>(@0x2).amount;
             *close_amount = amount;
+
+            let close_delay = &mut borrow_global_mut<CloseState<T>>(@0x2).delay;
+            *close_delay = delay;
         }
 
         public fun is_member<T>(acc: address): bool acquires Config {
@@ -108,10 +112,10 @@ address 0x2 {
             borrow_global<CloseState<T>>(@0x2).seq_time
         }
 
-        public fun is_closed<T>(): bool acquires Config, CloseState {
-            let observation_period = borrow_global<Config<T>>(@0x2).observation_period;
+        public fun is_closed<T>(): bool acquires CloseState {
             let seq_time = borrow_global<CloseState<T>>(@0x2).seq_time;
-            seq_time > 0 && (seq_time + observation_period) < Time::now()
+            let delay = borrow_global<CloseState<T>>(@0x2).delay;
+            seq_time > 0 && (seq_time + delay) < Time::now()
         }
     }
 }
