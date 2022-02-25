@@ -1,4 +1,4 @@
-address 0x3 {
+address 0x2 {
     module Fun {
         struct FunCoin {}
     }
