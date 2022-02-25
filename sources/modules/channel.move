@@ -36,12 +36,10 @@ address 0x2 {
             amount: Amount<T>,
         }
 
-        public fun init<T>(s: &signer, i: address, r: address) {
-            let s_addr = Signer::address_of(s);
-            // TODO: Remove this 0x2 dependence.
-            assert!(s_addr == @0x2, ENOT_MODULE);
+        public fun init<T>(i: signer, r: address) {
+            let i_addr = Signer::address_of(i);
             move_to(s, Config<T>{
-                i: i,
+                i: i_addr,
                 r: r,
             });
             move_to(s, CloseState<T>{
@@ -52,6 +50,7 @@ address 0x2 {
                 amount: Coin::zero<T>(),
                 delay: 0,
             });
+            join<T>(i);
         }
 
         public fun join<T>(acc: &signer) acquires Config {
