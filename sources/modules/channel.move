@@ -75,9 +75,10 @@ address 0x2 {
         public fun close<T>(seq: u64, payer: &signer, payee: &signer, amount: u64) acquires Config, CloseState {
             assert!(!is_closed<T>(), ECLOSED);
             let payer_addr = Signer::address_of(payer);
-            assert!(is_member<T>(payer_addr), ECLOSED);
             let payee_addr = Signer::address_of(payee);
-            assert!(is_member<T>(payee_addr), ECLOSED);
+            assert!(payer_addr != payee_addr, EMALFORMED);
+            assert!(is_member<T>(payer_addr), ENOT_MEMBER);
+            assert!(is_member<T>(payee_addr), ENOT_MEMBER);
 
             let close_seq = &mut borrow_global_mut<CloseState<T>>(@0x2).seq;
             assert!(seq > *close_seq, ESUPERSEDED);
