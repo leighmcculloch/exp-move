@@ -50,80 +50,81 @@ address 0x2 {
                 amount: Coin::zero<T>(),
                 delay: 0,
             });
-            join<T>(i);
+            join<T>(i_addr, i);
         }
 
-        public fun join<T>(acc: &signer) acquires Config {
+        public fun join<T>(owner: address, acc: &signer) acquires Config {
             let acc_addr = Signer::address_of(acc);
-            assert!(is_member<T>(acc_addr), ENOT_MEMBER);
+            assert!(is_member<T>(owner, acc_addr), ENOT_MEMBER);
             let zero = Coin::zero<T>();
             move_to(acc, Membership<T>{amount: zero})
         }
 
-        public fun deposit<T>(acc: address, a: Amount<T>) acquires Config, Membership {
-            assert!(is_member<T>(acc), ENOT_MEMBER);
+        public fun deposit<T>(owner: address, acc: address, a: Amount<T>) acquires Config, Membership {
+            assert!(is_member<T>(owner, acc), ENOT_MEMBER);
             let amount = &mut borrow_global_mut<Membership<T>>(acc).amount;
             Coin::merge_into<T>(amount, a)
         }
 
-        public fun withdraw<T>(acc: &signer): Amount<T> acquires Config, CloseState, Membership {
+        public fun withdraw<T>(owner: address, acc: &signer): Amount<T> acquires Config, CloseState, Membership {
             let acc_addr = Signer::address_of(acc);
-            assert!(is_member<T>(acc_addr), ENOT_MEMBER);
-            assert!(is_closed<T>(), ENOT_CLOSED);
+            assert!(is_member<T>(owner, acc_addr), ENOT_MEMBER);
+            assert!(is_closed<T>(owner), ENOT_CLOSED);
             let Membership { amount } = move_from<Membership<T>>(acc_addr);
             amount
         }
 
-        public fun close<T>(seq: u64, payer: &signer, payee: &signer, amount: u64, delay: u64) acquires Config, CloseState, Membership {
-            assert!(!is_closed<T>(), ECLOSED);
+        public fun close<T>(owner: address, seq: u64, payer: &signer, payee: &signer, amount: u64, delay: u64) acquires Config, CloseState, Membership {
+            assert!(!is_closed<T>(owner), ECLOSED);
 
             let payer_addr = Signer::address_of(payer);
             let payee_addr = Signer::address_of(payee);
             assert!(payer_addr != payee_addr, EMALFORMED);
-            assert!(is_member<T>(payer_addr), ENOT_MEMBER);
-            assert!(is_member<T>(payee_addr), ENOT_MEMBER);
+            assert!(is_member<T>(owner, payer_addr), ENOT_MEMBER);
+            assert!(is_member<T>(owner, payee_addr), ENOT_MEMBER);
 
-            let close_seq = &mut borrow_global_mut<CloseState<T>>(@0x2).seq;
+            let close_seq = &mut borrow_global_mut<CloseState<T>>(owner).seq;
             assert!(seq > *close_seq, ESUPERSEDED);
             *close_seq = seq;
 
-            let close_seq_time = &mut borrow_global_mut<CloseState<T>>(@0x2).seq_time;
+            let close_seq_time = &mut borrow_global_mut<CloseState<T>>(owner).seq_time;
             *close_seq_time = Time::now();
 
-            let close_payer_amount = &mut borrow_global_mut<Membership<T>>(payer_addr).amount;
-            let close_amount = &mut borrow_global_mut<CloseState<T>>(@0x2).amount;
+            let close_payer = borrow_global<CloseState<T>>(owner).payer;
+            let close_payer_amount = &mut borrow_global_mut<Membership<T>>(close_payer).amount;
+            let close_amount = &mut borrow_global_mut<CloseState<T>>(owner).amount;
             Coin::merge_into_from(close_payer_amount, close_amount);
 
             let payer_amount = &mut borrow_global_mut<Membership<T>>(payer_addr).amount;
             let payment_amount = Coin::split_out(payer_amount, amount);
             Coin::merge_into(close_amount, payment_amount);
 
-            let close_payer = &mut borrow_global_mut<CloseState<T>>(@0x2).payer;
+            let close_payer = &mut borrow_global_mut<CloseState<T>>(owner).payer;
             *close_payer = payer_addr;
 
-            let close_payee = &mut borrow_global_mut<CloseState<T>>(@0x2).payee;
+            let close_payee = &mut borrow_global_mut<CloseState<T>>(owner).payee;
             *close_payee = payee_addr;
 
-            let close_delay = &mut borrow_global_mut<CloseState<T>>(@0x2).delay;
+            let close_delay = &mut borrow_global_mut<CloseState<T>>(owner).delay;
             *close_delay = delay;
         }
 
-        public fun is_member<T>(acc: address): bool acquires Config {
-            let internal = borrow_global<Config<T>>(@0x2);
+        public fun is_member<T>(owner: address, acc: address): bool acquires Config {
+            let internal = borrow_global<Config<T>>(owner);
             acc == internal.i || acc == internal.r
         }
 
-        public fun seq<T>(): u64 acquires CloseState {
-            borrow_global<CloseState<T>>(@0x2).seq
+        public fun seq<T>(owner: address): u64 acquires CloseState {
+            borrow_global<CloseState<T>>(owner).seq
         }
 
-        public fun seq_time<T>(): u64 acquires CloseState {
-            borrow_global<CloseState<T>>(@0x2).seq_time
+        public fun seq_time<T>(owner: address): u64 acquires CloseState {
+            borrow_global<CloseState<T>>(owner).seq_time
         }
 
-        public fun is_closed<T>(): bool acquires CloseState {
-            let seq_time = borrow_global<CloseState<T>>(@0x2).seq_time;
-            let delay = borrow_global<CloseState<T>>(@0x2).delay;
+        public fun is_closed<T>(owner: address): bool acquires CloseState {
+            let seq_time = borrow_global<CloseState<T>>(owner).seq_time;
+            let delay = borrow_global<CloseState<T>>(owner).delay;
             seq_time > 0 && (seq_time + delay) < Time::now()
         }
     }
