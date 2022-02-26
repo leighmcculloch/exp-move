@@ -71,6 +71,11 @@ address 0x2 {
             assert!(is_member<T>(owner, acc_addr), ENOT_MEMBER);
             assert!(is_closed<T>(owner), ENOT_CLOSED);
             let Membership { amount } = move_from<Membership<T>>(acc_addr);
+            let close_payee = borrow_global<CloseState<T>>(owner).payee;
+            if (acc_addr == close_payee) {
+                let close_amount = &mut borrow_global_mut<CloseState<T>>(owner).amount;
+                Coin::merge_into_from(amount, close_amount);
+            }
             amount
         }
 
