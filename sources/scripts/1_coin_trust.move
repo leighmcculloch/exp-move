@@ -1,9 +1,9 @@
 script {
 
     use 0x2::Coin;
-    use 0x3::Fun::FunCoin;
+    use 0x2::Fun::FunCoin;
 
-    fun s_trust(s: signer) {
+    fun s_coin_trust(s: signer) {
         Coin::trust<FunCoin>(&s);
     }
 
