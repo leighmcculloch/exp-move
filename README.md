@@ -2,6 +2,8 @@
 
 Experiments with the [Move](https://github.com/diem/move) language.
 
+All code in this repo is my personal experimentation and not intended for use in production or mainnet of any network.
+
 ## Setup
 
 ```
