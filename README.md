@@ -73,7 +73,7 @@ move sandbox run sources/scripts/8_channel_close.move --signers 0x3 --signers 0x
 
 Lets try and withdraw straight away, we should see an error:
 ```
-move sandbox run sources/scripts/10_channel_withdraw.move --signers 0x3
+move sandbox run sources/scripts/10_channel_withdraw.move --signers 0x4 --args -0x3
 ```
 
 Submit another close that has a different agreement, that occurred before the
@@ -85,7 +85,7 @@ move sandbox run sources/scripts/8_channel_close.move --signers 0x4 --signers 0x
 Submit another close that has a different agreement, that occurred after the
 120 seq, we should see it succeed:
 ```
-move sandbox run sources/scripts/8_channel_close.move --signers 0x4 --signers 0x3 --args 0x3 --args 136 --args 10 --args 2
+move sandbox run sources/scripts/8_channel_close.move --signers 0x4 --signers 0x3 --args 0x3 --args 136 --args 8 --args 2
 ```
 
 Move time along at least two units:
