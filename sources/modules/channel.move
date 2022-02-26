@@ -36,16 +36,16 @@ address 0x2 {
             amount: Amount<T>,
         }
 
-        public fun init<T>(i: signer, r: address) {
+        public fun init<T>(i: &signer, r: address) acquires Config {
             let i_addr = Signer::address_of(i);
-            move_to(s, Config<T>{
+            move_to(i, Config<T>{
                 i: i_addr,
                 r: r,
             });
-            move_to(s, CloseState<T>{
+            move_to(i, CloseState<T>{
                 seq: 0,
                 seq_time: 0,
-                payer: i,
+                payer: i_addr,
                 payee: r,
                 amount: Coin::zero<T>(),
                 delay: 0,

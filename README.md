@@ -45,7 +45,7 @@ move sandbox run sources/scripts/4_time_init.move --signers 0x2
 
 Initialize a channel between the two accounts:
 ```
-move sandbox run sources/scripts/5_channel_init.move --signers 0x3 --args 0x3 --args 0x4
+move sandbox run sources/scripts/5_channel_init.move --signers 0x3 --args 0x4
 ```
 
 Have both accounts join the channel:
