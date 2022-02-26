@@ -74,8 +74,8 @@ address 0x2 {
             let close_payee = borrow_global<CloseState<T>>(owner).payee;
             if (acc_addr == close_payee) {
                 let close_amount = &mut borrow_global_mut<CloseState<T>>(owner).amount;
-                Coin::merge_into_from(amount, close_amount);
-            }
+                Coin::merge_into_from(&mut amount, close_amount);
+            };
             amount
         }
 
